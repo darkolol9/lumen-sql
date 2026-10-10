@@ -1,0 +1,25 @@
+# Sample MySQL databases for trying out Lumen.
+#   docker compose -f dev/docker-compose.yml up -d
+# Connect with host 127.0.0.1, port 3316:
+#   lumen  / lumen   – full access to shop, saas, hr
+#   reader / reader  – SELECT only (good for testing read-only connections)
+services:
+  mysql:
+    image: mysql:8.4
+    container_name: lumen-sample-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: lumen-root
+    ports:
+      - "127.0.0.1:3316:3306"
+    volumes:
+      - ./mysql-init:/docker-entrypoint-initdb.d:ro
+      - lumen-sample-mysql:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-plumen-root"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+volumes:
+  lumen-sample-mysql:

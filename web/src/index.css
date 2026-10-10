@@ -1,0 +1,296 @@
+@import 'tailwindcss';
+
+@theme {
+  --font-sans: 'Inter Variable', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono Variable', ui-monospace, 'SF Mono', Menlo, monospace;
+
+  --color-canvas: var(--c-canvas);
+  --color-panel: var(--c-panel);
+  --color-raised: var(--c-raised);
+  --color-hover: var(--c-hover);
+  --color-active: var(--c-active);
+  --color-line: var(--c-line);
+  --color-line-strong: var(--c-line-strong);
+  --color-fg: var(--c-fg);
+  --color-muted: var(--c-muted);
+  --color-faint: var(--c-faint);
+  --color-accent: var(--c-accent);
+  --color-accent-fg: var(--c-accent-fg);
+  --color-accent-soft: var(--c-accent-soft);
+  --color-ai: var(--c-ai);
+  --color-ai-soft: var(--c-ai-soft);
+  --color-ok: var(--c-ok);
+  --color-warn: var(--c-warn);
+  --color-bad: var(--c-bad);
+  --color-bad-soft: var(--c-bad-soft);
+
+  --animate-fade-in: fade-in 0.18s ease-out;
+  --animate-pop: pop 0.16s cubic-bezier(0.2, 0.9, 0.3, 1.2);
+  --animate-shimmer: shimmer 1.4s linear infinite;
+}
+
+:root {
+  color-scheme: dark;
+  --c-canvas: #07090f;
+  --c-panel: #0c1018;
+  --c-raised: #121722;
+  --c-hover: #181e2b;
+  --c-active: #1e2636;
+  --c-line: #1b2130;
+  --c-line-strong: #283044;
+  --c-fg: #e7eaf3;
+  --c-muted: #9098ad;
+  --c-faint: #5d667c;
+  --c-accent: #38bdf8;
+  --c-accent-fg: #04121c;
+  --c-accent-soft: rgb(56 189 248 / 0.12);
+  --c-ai: #a78bfa;
+  --c-ai-soft: rgb(167 139 250 / 0.12);
+  --c-ok: #34d399;
+  --c-warn: #fbbf24;
+  --c-bad: #f87171;
+  --c-bad-soft: rgb(248 113 113 / 0.1);
+  --shadow-pop: 0 16px 48px -12px rgb(0 0 0 / 0.65), 0 0 0 1px var(--c-line-strong);
+  --series-1: #3987e5;
+  --series-2: #d95926;
+  --series-3: #199e70;
+  --series-4: #c98500;
+  --glow: radial-gradient(1200px 500px at 10% -10%, rgb(56 189 248 / 0.07), transparent 60%),
+    radial-gradient(900px 500px at 110% 0%, rgb(167 139 250 / 0.06), transparent 60%);
+}
+
+:root[data-theme='light'] {
+  color-scheme: light;
+  --c-canvas: #f3f5f9;
+  --c-panel: #ffffff;
+  --c-raised: #f8f9fc;
+  --c-hover: #eef1f6;
+  --c-active: #e4e9f2;
+  --c-line: #e3e7ef;
+  --c-line-strong: #cfd6e3;
+  --c-fg: #111827;
+  --c-muted: #5b6477;
+  --c-faint: #98a1b3;
+  --c-accent: #0e8fd6;
+  --c-accent-fg: #ffffff;
+  --c-accent-soft: rgb(14 143 214 / 0.1);
+  --c-ai: #7c3aed;
+  --c-ai-soft: rgb(124 58 237 / 0.08);
+  --c-ok: #059669;
+  --c-warn: #b45309;
+  --c-bad: #dc2626;
+  --c-bad-soft: rgb(220 38 38 / 0.07);
+  --shadow-pop: 0 16px 40px -12px rgb(15 23 42 / 0.25), 0 0 0 1px var(--c-line-strong);
+  --series-1: #2a78d6;
+  --series-2: #eb6834;
+  --series-3: #1baf7a;
+  --series-4: #eda100;
+  --glow: none;
+}
+
+html,
+body {
+  height: 100%;
+  overflow: hidden;
+}
+/* pinned so focus/scrollIntoView inside widgets can never scroll the app shell */
+#root {
+  position: fixed;
+  inset: 0;
+}
+
+body {
+  margin: 0;
+  background: var(--c-canvas);
+  color: var(--c-fg);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  font-feature-settings: 'cv11', 'ss01', 'ss03';
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+}
+
+::selection {
+  background: rgb(56 189 248 / 0.3);
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--c-line-strong) transparent;
+}
+
+button {
+  cursor: pointer;
+}
+button:disabled {
+  cursor: default;
+}
+
+.mono {
+  font-family: var(--font-mono);
+  font-feature-settings: 'zero', 'calt' 0;
+}
+
+.app-glow {
+  background-image: var(--glow);
+}
+
+.ai-gradient {
+  background: linear-gradient(135deg, #38bdf8 0%, #818cf8 50%, #c084fc 100%);
+}
+.ai-text {
+  background: linear-gradient(90deg, #38bdf8, #a78bfa 60%, #f0abfc);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.shimmer-bar {
+  background: linear-gradient(90deg, transparent, var(--c-accent), transparent);
+  background-size: 50% 100%;
+  background-repeat: no-repeat;
+  animation: var(--animate-shimmer);
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(2px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes pop {
+  from {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes shimmer {
+  from {
+    background-position: -100% 0;
+  }
+  to {
+    background-position: 200% 0;
+  }
+}
+
+/* resizable panel handles */
+[data-separator] {
+  position: relative;
+  background: var(--c-line);
+  transition: background 0.15s;
+  outline: none;
+}
+[data-separator]:hover,
+[data-separator][data-separator-state='drag'],
+[data-separator]:focus-visible {
+  background: var(--c-accent);
+}
+[data-separator]::after {
+  content: '';
+  position: absolute;
+  inset: -3px;
+}
+
+/* markdown in AI messages */
+.prose-ai {
+  line-height: 1.6;
+}
+.prose-ai p {
+  margin: 0.45em 0;
+}
+.prose-ai ul,
+.prose-ai ol {
+  margin: 0.4em 0;
+  padding-left: 1.2em;
+}
+.prose-ai ul {
+  list-style: disc;
+}
+.prose-ai ol {
+  list-style: decimal;
+}
+.prose-ai li {
+  margin: 0.15em 0;
+}
+.prose-ai strong {
+  color: var(--c-fg);
+  font-weight: 600;
+}
+.prose-ai h1,
+.prose-ai h2,
+.prose-ai h3 {
+  font-weight: 600;
+  margin: 0.8em 0 0.3em;
+  font-size: 1.02em;
+}
+.prose-ai code {
+  font-family: var(--font-mono);
+  font-size: 0.88em;
+  background: var(--c-hover);
+  border: 1px solid var(--c-line);
+  padding: 0.05em 0.35em;
+  border-radius: 4px;
+}
+.prose-ai pre code {
+  background: none;
+  border: 0;
+  padding: 0;
+}
+.prose-ai table {
+  border-collapse: collapse;
+  margin: 0.5em 0;
+  font-size: 0.92em;
+  display: block;
+  overflow-x: auto;
+}
+.prose-ai th,
+.prose-ai td {
+  border: 1px solid var(--c-line);
+  padding: 3px 8px;
+  text-align: left;
+  white-space: nowrap;
+}
+.prose-ai th {
+  background: var(--c-raised);
+  font-weight: 600;
+}
+.prose-ai a {
+  color: var(--c-accent);
+}
+
+/* monaco tweaks */
+.monaco-editor .suggest-widget {
+  border-radius: 8px !important;
+  overflow: hidden;
+}
+.monaco-editor .current-statement {
+  background: var(--c-accent-soft);
+}
+.monaco-editor .error-statement {
+  background: var(--c-bad-soft);
+}
+.monaco-editor .current-statement-gutter {
+  border-left: 2px solid var(--c-accent);
+  margin-left: 3px;
+}
+
+/* cmdk */
+[cmdk-item][data-selected='true'] {
+  background: var(--c-hover);
+}
+[cmdk-group-heading] {
+  padding: 8px 12px 4px;
+  font-size: 11px;
+  color: var(--c-faint);
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}

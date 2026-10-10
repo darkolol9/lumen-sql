@@ -1,0 +1,191 @@
+import { serve } from '@hono/node-server'
+import { serveStatic } from '@hono/node-server/serve-static'
+import { Hono } from 'hono'
+import { streamSSE } from 'hono/streaming'
+import { existsSync } from 'node:fs'
+import { nanoid } from 'nanoid'
+import type { AiContext, AiMessage, Connection, Settings, Worksheet } from '../shared/types.ts'
+import { listModels, runAgent } from './ai.ts'
+import { catalog, databases, invalidateConnection } from './catalog.ts'
+import { cancelRun, createDriver, evictDriver, requireConnection, runSql, StatementError } from './drivers/index.ts'
+import * as store from './store.ts'
+
+const app = new Hono()
+
+app.onError((err, c) => {
+  console.error(err)
+  return c.json({ error: err.message }, 500)
+})
+
+app.get('/api/bootstrap', (c) =>
+  c.json({
+    connections: store.listConnections(),
+    workspaces: store.listWorkspaces(),
+    worksheets: store.listWorksheets(),
+    settings: store.publicSettings(),
+  }),
+)
+
+// ── connections ────────────────────────────────────────────────────────────
+
+app.post('/api/connections', async (c) => {
+  const body = await c.req.json<Connection>()
+  const saved = store.saveConnection(body)
+  await evictDriver(saved.id)
+  invalidateConnection(saved.id)
+  return c.json(saved)
+})
+
+app.delete('/api/connections/:id', async (c) => {
+  const id = c.req.param('id')
+  store.deleteConnection(id)
+  await evictDriver(id)
+  invalidateConnection(id)
+  return c.json({ ok: true })
+})
+
+app.post('/api/connections/test', async (c) => {
+  const body = await c.req.json<Connection>()
+  const existing = body.id ? store.getConnection(body.id) : undefined
+  // masked secrets in the form fall back to the stored ones
+  const conn = store.resolveSecrets({ ...body, id: body.id ?? 'test' }, existing)
+  const driver = createDriver(conn)
+  const t0 = Date.now()
+  try {
+    const version = await driver.test()
+    return c.json({ ok: true, version, elapsedMs: Date.now() - t0 })
+  } catch (e) {
+    return c.json({ ok: false, error: (e as Error).message })
+  } finally {
+    driver.close().catch(() => {})
+  }
+})
+
+app.get('/api/connections/:id/databases', async (c) => {
+  return c.json(await databases(c.req.param('id'), c.req.query('refresh') === '1'))
+})
+
+app.get('/api/connections/:id/catalog', async (c) => {
+  const db = c.req.query('database')
+  if (!db) return c.json({ error: 'database is required' }, 400)
+  return c.json(await catalog(c.req.param('id'), db, c.req.query('refresh') === '1'))
+})
+
+// ── query execution ────────────────────────────────────────────────────────
+
+app.post('/api/query', async (c) => {
+  const body = await c.req.json<{
+    connectionId: string
+    sql: string
+    database?: string
+    schema?: string
+    runId?: string
+    worksheetId?: string
+  }>()
+  const runId = body.runId ?? nanoid()
+  const settings = store.getSettings()
+  const t0 = Date.now()
+  requireConnection(body.connectionId)
+  try {
+    const results = await runSql({
+      connectionId: body.connectionId,
+      sql: body.sql,
+      database: body.database,
+      schema: body.schema,
+      maxRows: settings.maxRows,
+      runId,
+      sessionKey: body.worksheetId ?? 'default',
+    })
+    const last = results.at(-1)
+    store.addHistory({
+      connectionId: body.connectionId,
+      worksheetId: body.worksheetId,
+      sql: body.sql,
+      ok: true,
+      rowCount: last?.rowCount,
+      elapsedMs: Date.now() - t0,
+      source: 'user',
+    })
+    if (results.some((r) => r.kind === 'command' || /^\s*(create|drop|alter|rename)/i.test(r.statement))) invalidateConnection(body.connectionId)
+    return c.json({ runId, results, elapsedMs: Date.now() - t0 })
+  } catch (e) {
+    const err = e instanceof StatementError ? e : new StatementError((e as Error).message, 0, [])
+    store.addHistory({
+      connectionId: body.connectionId,
+      worksheetId: body.worksheetId,
+      sql: body.sql,
+      ok: false,
+      error: err.message,
+      elapsedMs: Date.now() - t0,
+      source: 'user',
+    })
+    return c.json({
+      runId,
+      results: err.results,
+      elapsedMs: Date.now() - t0,
+      error: { message: err.message, statementIndex: err.index, statement: '' },
+    })
+  }
+})
+
+app.post('/api/query/:runId/cancel', (c) => c.json({ cancelled: cancelRun(c.req.param('runId')) }))
+
+// ── workspaces / worksheets ────────────────────────────────────────────────
+
+app.post('/api/workspaces', async (c) => c.json(store.saveWorkspace(await c.req.json())))
+app.delete('/api/workspaces/:id', (c) => {
+  store.deleteWorkspace(c.req.param('id'))
+  return c.json({ ok: true })
+})
+app.post('/api/worksheets', async (c) => c.json(store.saveWorksheet(await c.req.json<Worksheet>())))
+app.delete('/api/worksheets/:id', (c) => {
+  store.deleteWorksheet(c.req.param('id'))
+  return c.json({ ok: true })
+})
+
+// ── settings & history ─────────────────────────────────────────────────────
+
+app.get('/api/settings', (c) => c.json(store.publicSettings()))
+app.put('/api/settings', async (c) => c.json(store.updateSettings(await c.req.json<Partial<Settings>>())))
+app.get('/api/history', (c) => c.json(store.listHistory()))
+app.delete('/api/history', (c) => {
+  store.clearHistory()
+  return c.json({ ok: true })
+})
+
+// ── AI ─────────────────────────────────────────────────────────────────────
+
+app.get('/api/ai/models', async (c) => c.json(await listModels()))
+
+app.post('/api/ai/chat', async (c) => {
+  const body = await c.req.json<{ messages: AiMessage[]; context: AiContext; model?: string }>()
+  return streamSSE(c, async (stream) => {
+    const ac = new AbortController()
+    stream.onAbort(() => ac.abort())
+    try {
+      for await (const ev of runAgent({ ...body, signal: ac.signal })) {
+        await stream.writeSSE({ data: JSON.stringify(ev) })
+      }
+    } catch (e) {
+      if (!ac.signal.aborted) await stream.writeSSE({ data: JSON.stringify({ type: 'error', message: (e as Error).message }) })
+    }
+  })
+})
+
+// ── static (production) ────────────────────────────────────────────────────
+
+if (process.env.NODE_ENV === 'production' && existsSync('dist')) {
+  app.use('/*', serveStatic({ root: './dist' }))
+  app.get('*', serveStatic({ path: './dist/index.html' }))
+}
+
+const port = Number(process.env.PORT ?? 3001)
+const hostname = process.env.HOST ?? '127.0.0.1'
+serve({ fetch: app.fetch, port, hostname }, () => console.log(`Lumen API listening on http://${hostname}:${port}`))
+
+for (const sig of ['SIGINT', 'SIGTERM'] as const) {
+  process.on(sig, () => {
+    store.flush()
+    process.exit(0)
+  })
+}

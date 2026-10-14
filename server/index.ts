@@ -3,6 +3,7 @@ import { serveStatic } from '@hono/node-server/serve-static'
 import { Hono } from 'hono'
 import { streamSSE } from 'hono/streaming'
 import { existsSync } from 'node:fs'
+import { join } from 'node:path'
 import { nanoid } from 'nanoid'
 import type { AiContext, AiMessage, Connection, EditRequest, Settings, Worksheet } from '../shared/types.ts'
 import { listModels, runAgent } from './ai.ts'
@@ -206,20 +207,33 @@ app.post('/api/ai/chat', async (c) => {
   })
 })
 
-// ── static (production) ────────────────────────────────────────────────────
+// ── startup ────────────────────────────────────────────────────────────────
 
-if (process.env.NODE_ENV === 'production' && existsSync('dist')) {
-  app.use('/*', serveStatic({ root: './dist' }))
-  app.get('*', serveStatic({ path: './dist/index.html' }))
+export interface ServerOptions {
+  port: number
+  hostname: string
+  /** Built UI to serve alongside the API (production and desktop). */
+  staticDir?: string
 }
 
-const port = Number(process.env.PORT ?? 7431)
-const hostname = process.env.HOST ?? '127.0.0.1'
-serve({ fetch: app.fetch, port, hostname }, () => console.log(`Lumen API listening on http://${hostname}:${port}`))
-
-for (const sig of ['SIGINT', 'SIGTERM'] as const) {
-  process.on(sig, () => {
-    store.flush()
-    process.exit(0)
+/** Starts the HTTP server and resolves with the port it actually bound (port 0 picks a free one). */
+export function startServer({ port, hostname, staticDir }: ServerOptions) {
+  if (staticDir && existsSync(staticDir)) {
+    app.use('/*', serveStatic({ root: staticDir }))
+    app.get('*', serveStatic({ path: join(staticDir, 'index.html') }))
+  }
+  return new Promise<{ port: number; close: () => void }>((done, fail) => {
+    const server = serve({ fetch: app.fetch, port, hostname }, (info) =>
+      done({
+        port: info.port,
+        close: () => {
+          store.flush()
+          server.close()
+        },
+      }),
+    )
+    server.once('error', fail)
   })
 }
+
+export const flushStore = store.flush

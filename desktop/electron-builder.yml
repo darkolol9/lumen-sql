@@ -1,0 +1,20 @@
+appId: dev.lumen.sql
+productName: Lumen SQL
+# everything the app needs is bundled into desktop/build.mjs's output, so no node_modules are packed
+directories:
+  app: dist-desktop/app
+  output: dist-desktop/release
+  buildResources: desktop
+files:
+  - '**/*'
+  - '!**/*.map'
+  - '!node_modules/**'
+npmRebuild: false
+publish: null
+linux:
+  icon: desktop/icon.png
+  category: Development
+  executableName: lumen-sql
+  synopsis: SQL workbench for MySQL, Snowflake and ClickHouse
+  syncDesktopName: true
+artifactName: lumen-sql-${version}-${arch}.${ext}

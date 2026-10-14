@@ -4,10 +4,14 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "dev": "concurrently -k -n api,web -c magenta,cyan \"tsx watch server/index.ts\" \"vite\"",
+    "dev": "concurrently -k -n api,web -c magenta,cyan \"tsx watch server/cli.ts\" \"vite\"",
     "build": "vite build",
-    "start": "NODE_ENV=production tsx server/index.ts",
-    "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.server.json"
+    "start": "NODE_ENV=production tsx server/cli.ts",
+    "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.server.json",
+    "dev:desktop": "node desktop/build.mjs --main-only && LUMEN_DEV_URL=http://localhost:5173 concurrently -k -n api,web,app -c magenta,cyan,green \"tsx watch server/cli.ts\" \"vite\" \"electron dist-desktop/app/main.cjs\"",
+    "build:desktop": "vite build && node desktop/build.mjs && electron-builder --config desktop/electron-builder.yml --linux AppImage",
+    "build:desktop:rpm": "vite build && node desktop/build.mjs && electron-builder --config desktop/electron-builder.yml --linux rpm",
+    "build:desktop:deb": "vite build && node desktop/build.mjs && electron-builder --config desktop/electron-builder.yml --linux deb"
   },
   "dependencies": {
     "@clickhouse/client": "^1.24.1",
@@ -42,6 +46,9 @@
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.1.2",
     "concurrently": "^10.0.6",
+    "electron": "^44.7.2",
+    "electron-builder": "^26.15.3",
+    "esbuild": "^0.28.2",
     "tailwindcss": "^4.3.3",
     "tsx": "^4.23.15",
     "typescript": "^7.0.2",
@@ -49,6 +56,7 @@
   },
   "pnpm": {
     "onlyBuiltDependencies": [
+      "electron",
       "esbuild"
     ]
   }

@@ -9,6 +9,19 @@ pnpm dev          # API on :7431, UI on http://localhost:5173
 
 Production: `pnpm build && pnpm start` (serves the UI and API from http://127.0.0.1:7431).
 
+## Desktop app (Linux)
+
+The same app packaged with Electron. It runs the API inside the app (on `127.0.0.1:7432`, or a free port if that's taken), so nothing else needs to be running.
+
+```bash
+pnpm build:desktop                 # → dist-desktop/release/lumen-sql-<version>-x86_64.AppImage
+desktop/install.sh                 # install to ~/.local/opt and add it to the app launcher
+desktop/install.sh --import-data   # also copy ./data into the desktop app (first install only)
+pnpm dev:desktop                   # dev: API + Vite + an Electron window with hot reload
+```
+
+`pnpm build:desktop:rpm` and `build:desktop:deb` build packages instead; rpm needs `rpm-build` installed. The desktop app keeps its own data in `~/.config/Lumen SQL/data`, separate from the web version's `./data`.
+
 ## Sample databases
 
 ```bash
@@ -67,6 +80,8 @@ Three seeded databases: `shop` (e-commerce), `saas` (accounts, subscriptions, 15
 server/            Hono API: drivers, catalog cache, AI agent, encrypted store
   drivers/         mysql.ts · snowflake.ts · clickhouse.ts (common interface)
   ai.ts            OpenRouter streaming + tool loop
+  cli.ts           entry point for `pnpm dev` / `pnpm start`
+desktop/           Electron main process, bundling script, electron-builder config, installer
 shared/            types + SQL lexer, statement splitter, read-only guard
 web/src/
   lib/             monaco setup + completion engine, editor actions, api client

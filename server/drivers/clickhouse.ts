@@ -39,9 +39,21 @@ export class ClickhouseDriver implements Driver {
   }
 
   async test() {
-    const rs = await this.client().query({ query: 'SELECT version() AS v', format: 'JSONEachRow' })
-    const rows = (await rs.json()) as { v: string }[]
-    return `ClickHouse ${rows[0]?.v ?? ''}`
+    try {
+      const rs = await this.client().query({ query: 'SELECT version() AS v', format: 'JSONEachRow' })
+      const rows = (await rs.json()) as { v: string }[]
+      return `ClickHouse ${rows[0]?.v ?? ''}`
+    } catch (e) {
+      const msg = (e as Error).message
+      // the server took the TCP connection but never answered HTTP: wrong host/port/protocol, not bad credentials
+      if (/socket hang up|ECONNRESET|EPROTO|Timeout error|wrong version number/i.test(msg))
+        throw new Error(
+          `${msg}: the server accepted the connection but didn't answer as ClickHouse's HTTP interface. ` +
+            `Check that the host is the ClickHouse server itself (not a web UI or load balancer), the port is the HTTP port ` +
+            `(8123, or 8443 with HTTPS, never the native 9000), and the HTTPS toggle matches the port.`,
+        )
+      throw e
+    }
   }
 
   async runBatch(statements: string[], ctx: ExecContext, onResult?: (r: StatementResult) => void) {

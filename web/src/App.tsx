@@ -5,6 +5,7 @@ import { Toaster } from 'sonner'
 import { AiPanel } from './components/AiPanel'
 import { CommandPalette } from './components/CommandPalette'
 import { ConnectionDialog } from './components/ConnectionDialog'
+import { ConnectionsPanel } from './components/ConnectionsPanel'
 import { DataExplorer } from './components/DataExplorer'
 import { ConfirmDialog, SettingsDialog } from './components/Dialogs'
 import { HistoryPanel } from './components/HistoryPanel'
@@ -13,11 +14,12 @@ import { Button, Spinner } from './components/ui'
 import { WorksheetsPanel } from './components/WorksheetsPanel'
 import { WorksheetView } from './components/WorksheetView'
 import { focusAi } from './lib/aiBus'
+import { applyTheme, themeById } from './lib/themes'
 import { useApp } from './store/app'
 
 export default function App() {
   const loaded = useApp((s) => s.loaded)
-  const theme = useApp((s) => s.theme)
+  const theme = useApp((s) => s.themePreview ?? s.theme)
   const leftPanel = useApp((s) => s.leftPanel)
   const aiOpen = useApp((s) => s.aiOpen)
   const activeTabId = useApp((s) => s.activeTabId)
@@ -28,7 +30,7 @@ export default function App() {
   }, [])
 
   useEffect(() => {
-    document.documentElement.dataset.theme = theme
+    applyTheme(theme)
   }, [theme])
 
   // global shortcuts outside the editor
@@ -80,6 +82,7 @@ export default function App() {
             <Panel id="left" defaultSize={280} minSize={200} maxSize={520} className="bg-panel">
               {leftPanel === 'worksheets' && <WorksheetsPanel />}
               {leftPanel === 'data' && <DataExplorer />}
+              {leftPanel === 'connections' && <ConnectionsPanel />}
               {leftPanel === 'history' && <HistoryPanel />}
             </Panel>
             <Separator className="w-px" />
@@ -105,7 +108,7 @@ export default function App() {
       <SettingsDialog />
       <ConfirmDialog />
       <CommandPalette />
-      <Toaster theme={theme} position="bottom-right" toastOptions={{ style: { background: 'var(--c-raised)', border: '1px solid var(--c-line-strong)', color: 'var(--c-fg)' } }} />
+      <Toaster theme={themeById(theme).dark ? 'dark' : 'light'} position="bottom-right" toastOptions={{ style: { background: 'var(--c-raised)', border: '1px solid var(--c-line-strong)', color: 'var(--c-fg)' } }} />
     </div>
   )
 }

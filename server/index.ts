@@ -4,10 +4,10 @@ import { Hono } from 'hono'
 import { streamSSE } from 'hono/streaming'
 import { existsSync } from 'node:fs'
 import { nanoid } from 'nanoid'
-import type { AiContext, AiMessage, Connection, Settings, Worksheet } from '../shared/types.ts'
+import type { AiContext, AiMessage, Connection, EditRequest, Settings, Worksheet } from '../shared/types.ts'
 import { listModels, runAgent } from './ai.ts'
 import { catalog, databases, invalidateConnection } from './catalog.ts'
-import { cancelRun, createDriver, evictDriver, requireConnection, runSql, StatementError } from './drivers/index.ts'
+import { cancelRun, createDriver, driverFor, evictDriver, requireConnection, runSql, StatementError } from './drivers/index.ts'
 import * as store from './store.ts'
 
 const app = new Hono()
@@ -69,6 +69,40 @@ app.get('/api/connections/:id/catalog', async (c) => {
   const db = c.req.query('database')
   if (!db) return c.json({ error: 'database is required' }, 400)
   return c.json(await catalog(c.req.param('id'), db, c.req.query('refresh') === '1'))
+})
+
+// ── in-place row edits ─────────────────────────────────────────────────────
+// The client sends structured edits, never SQL: preview and apply build the statements the same way,
+// so what the user confirms is exactly what runs.
+
+app.post('/api/edits/preview', async (c) => {
+  const body = await c.req.json<EditRequest>()
+  const driver = driverFor(requireConnection(body.connectionId))
+  if (!driver.buildEdits) return c.json({ error: 'Editing is not supported for this connection type' }, 400)
+  try {
+    return c.json({ statements: await driver.buildEdits(body.target, body.edits) })
+  } catch (e) {
+    return c.json({ error: (e as Error).message }, 400)
+  }
+})
+
+app.post('/api/edits/apply', async (c) => {
+  const body = await c.req.json<EditRequest & { worksheetId?: string }>()
+  const conn = requireConnection(body.connectionId)
+  const driver = driverFor(conn)
+  if (!driver.applyEdits) return c.json({ error: 'Editing is not supported for this connection type' }, 400)
+  if (conn.readOnly) return c.json({ error: 'This connection is read-only' }, 400)
+  const t0 = Date.now()
+  try {
+    const statements = await driver.applyEdits(body.target, body.edits)
+    store.addHistory({ connectionId: conn.id, worksheetId: body.worksheetId, sql: statements.join(';\n') + ';', ok: true, elapsedMs: Date.now() - t0, source: 'user' })
+    return c.json({ statements, elapsedMs: Date.now() - t0 })
+  } catch (e) {
+    const message = (e as Error).message
+    const sql = await driver.buildEdits?.(body.target, body.edits).catch(() => [])
+    if (sql?.length) store.addHistory({ connectionId: conn.id, worksheetId: body.worksheetId, sql: sql.join(';\n') + ';', ok: false, error: message, elapsedMs: Date.now() - t0, source: 'user' })
+    return c.json({ error: message }, 400)
+  }
 })
 
 // ── query execution ────────────────────────────────────────────────────────
@@ -179,7 +213,7 @@ if (process.env.NODE_ENV === 'production' && existsSync('dist')) {
   app.get('*', serveStatic({ path: './dist/index.html' }))
 }
 
-const port = Number(process.env.PORT ?? 3001)
+const port = Number(process.env.PORT ?? 7431)
 const hostname = process.env.HOST ?? '127.0.0.1'
 serve({ fetch: app.fetch, port, hostname }, () => console.log(`Lumen API listening on http://${hostname}:${port}`))
 

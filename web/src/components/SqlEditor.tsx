@@ -8,6 +8,7 @@ import { editors, monaco, worksheetUri, type Editor as Ed } from '../lib/monaco'
 import { modKey } from '../lib/format'
 import { useApp } from '../store/app'
 import { Button, Kbd } from './ui'
+import { monacoThemeId } from '../lib/themes'
 
 const EDITOR_OPTIONS: monaco.editor.IStandaloneEditorConstructionOptions = {
   fontFamily: "'JetBrains Mono Variable', ui-monospace, monospace",
@@ -50,7 +51,7 @@ const EDITOR_OPTIONS: monaco.editor.IStandaloneEditorConstructionOptions = {
 
 export function SqlEditor({ worksheetId }: { worksheetId: string }) {
   const sql = useApp((s) => s.worksheets[worksheetId]?.sql ?? '')
-  const theme = useApp((s) => s.theme)
+  const theme = useApp((s) => s.themePreview ?? s.theme)
   const pending = useApp((s) => s.pendingEdits[worksheetId])
   const run = useApp((s) => s.runs[worksheetId])
   const edRef = useRef<Ed | null>(null)
@@ -186,7 +187,7 @@ export function SqlEditor({ worksheetId }: { worksheetId: string }) {
     return () => window.removeEventListener('keydown', onKey, true)
   })
 
-  const monacoTheme = theme === 'light' ? 'lumen-light' : 'lumen-dark'
+  const monacoTheme = monacoThemeId(theme)
   return (
     <div className="relative h-full w-full">
       <Editor

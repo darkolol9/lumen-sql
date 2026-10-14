@@ -81,6 +81,30 @@ export interface HistoryEntry {
 export interface Column {
   name: string
   type: string
+  /** Underlying table column, when this result column maps 1:1 onto one (MySQL only). */
+  source?: string
+  /** Set when the value can be written back as a plain literal (not binary, not an expression). */
+  editable?: boolean
+}
+
+/** A result whose rows can be edited in place: one base table, with its full primary key in the result. */
+export interface EditTarget {
+  database: string
+  table: string
+  /** Primary key columns of the table, in key order. */
+  key: string[]
+}
+
+/** One edited row: the original primary key values and the new column values (null = SQL NULL). */
+export interface RowEdit {
+  key: Record<string, unknown>
+  changes: Record<string, string | null>
+}
+
+export interface EditRequest {
+  connectionId: string
+  target: EditTarget
+  edits: RowEdit[]
 }
 
 export interface StatementResult {
@@ -94,6 +118,7 @@ export interface StatementResult {
   elapsedMs: number
   queryId?: string
   message?: string
+  editTarget?: EditTarget
 }
 
 export interface RunResponse {

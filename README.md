@@ -4,10 +4,10 @@ A fast, good-looking local SQL workbench for **MySQL**, **Snowflake** and **Clic
 
 ```bash
 pnpm install
-pnpm dev          # API on :3001, UI on http://localhost:5173
+pnpm dev          # API on :7431, UI on http://localhost:5173
 ```
 
-Production: `pnpm build && pnpm start` (serves the UI and API from http://127.0.0.1:3001).
+Production: `pnpm build && pnpm start` (serves the UI and API from http://127.0.0.1:7431).
 
 ## Sample databases
 

@@ -12,23 +12,47 @@ const GUTTER = 56
 
 type Sort = { col: number; dir: 'asc' | 'desc' } | null
 
+/** Pending cell edits keyed by original row index, then column index. null = SQL NULL. */
+export type CellEdits = Record<number, Record<number, string | null>>
+
+/** Text shown in the inline editor for a stored value. */
+const editText = (v: unknown) => (v === null || v === undefined ? '' : typeof v === 'object' ? JSON.stringify(v) : String(v))
+
 export function ResultsGrid({
   columns,
   rows,
   filter,
   selectedColumn,
   onSelectColumn,
+  editable,
+  edits,
+  onEdit,
 }: {
   columns: Column[]
   rows: unknown[][]
   filter: string
   selectedColumn?: number
   onSelectColumn: (i: number | undefined) => void
+  /** Rows can be edited in place (the result maps onto one table with its primary key). */
+  editable?: boolean
+  edits?: CellEdits
+  /** value undefined reverts the cell to its original value */
+  onEdit?: (row: number, col: number, value: string | null | undefined) => void
 }) {
   const scrollRef = useRef<HTMLDivElement>(null)
   const [sort, setSort] = useState<Sort>(null)
   const [cell, setCell] = useState<{ r: number; c: number } | null>(null)
   const [viewer, setViewer] = useState<{ value: unknown; column: string } | null>(null)
+  const [editing, setEditing] = useState<{ ri: number; ci: number } | null>(null)
+  const canEdit = (ci: number) => !!editable && !!columns[ci]?.editable
+  const valueAt = (ri: number, ci: number) => (edits?.[ri]?.[ci] !== undefined ? edits[ri][ci] : rows[ri][ci])
+  const commit = (ri: number, ci: number, value: string | null) => {
+    setEditing(null)
+    const original = rows[ri][ci]
+    const same = value === null ? original === null : original !== null && editText(original) === value
+    onEdit?.(ri, ci, same ? undefined : value)
+    scrollRef.current?.focus()
+  }
   const numeric = useMemo(() => columns.map((c) => isNumericType(c.type)), [columns])
 
   const initialWidths = useMemo(
@@ -45,6 +69,7 @@ export function ResultsGrid({
     setWidths(initialWidths)
     setSort(null)
     setCell(null)
+    setEditing(null)
   }, [initialWidths])
 
   const view = useMemo(() => {
@@ -102,9 +127,15 @@ export function ResultsGrid({
     else if (e.key === 'ArrowUp') mv(-1, 0)
     else if (e.key === 'ArrowLeft') mv(0, -1)
     else if (e.key === 'ArrowRight') mv(0, 1)
-    else if (e.key === 'Enter') setViewer({ value: rows[view[cell.r]][cell.c], column: columns[cell.c].name })
-    else if ((e.metaKey || e.ctrlKey) && e.key === 'c') {
-      navigator.clipboard.writeText(cellText(rows[view[cell.r]][cell.c]))
+    else if (e.key === 'Enter') setViewer({ value: valueAt(view[cell.r], cell.c), column: columns[cell.c].name })
+    else if (e.key === 'F2' && canEdit(cell.c)) {
+      e.preventDefault()
+      setEditing({ ri: view[cell.r], ci: cell.c })
+    } else if ((e.key === 'Delete' || e.key === 'Backspace') && edits?.[view[cell.r]]?.[cell.c] !== undefined) {
+      e.preventDefault()
+      onEdit?.(view[cell.r], cell.c, undefined)
+    } else if ((e.metaKey || e.ctrlKey) && e.key === 'c') {
+      navigator.clipboard.writeText(cellText(valueAt(view[cell.r], cell.c)))
       toast.success('Copied cell')
     }
   }
@@ -158,19 +189,28 @@ export function ResultsGrid({
                   className={clsx('absolute left-0 grid w-full border-b border-line/70 hover:bg-hover/60', vr.index % 2 === 1 && 'bg-raised/35')}
                   style={{ transform: `translateY(${vr.start}px)`, height: ROW_H, gridTemplateColumns: template }}
                 >
-                  <div className="sticky left-0 flex items-center justify-end border-r border-line bg-panel pr-2 text-[10.5px] text-faint tabular-nums">{ri + 1}</div>
-                  {row.map((v, ci) => {
+                  <div className={clsx('sticky left-0 flex items-center justify-end gap-1 border-r border-line bg-panel pr-2 text-[10.5px] tabular-nums', edits?.[ri] ? 'text-warn' : 'text-faint')}>
+                    {edits?.[ri] && <span className="h-1.5 w-1.5 rounded-full bg-warn" />}
+                    {ri + 1}
+                  </div>
+                  {row.map((orig, ci) => {
                     const sel = cell?.r === vr.index && cell.c === ci
+                    const changed = edits?.[ri]?.[ci] !== undefined
+                    const v = changed ? edits![ri][ci] : orig
+                    if (editing?.ri === ri && editing.ci === ci)
+                      return <CellEditor key={ci} initial={editText(v)} wasNull={v === null} onCommit={(val) => commit(ri, ci, val)} onCancel={() => (setEditing(null), scrollRef.current?.focus())} />
                     return (
                       <div
                         key={ci}
                         onClick={() => setCell({ r: vr.index, c: ci })}
-                        onDoubleClick={() => setViewer({ value: v, column: columns[ci].name })}
+                        onDoubleClick={() => (canEdit(ci) ? setEditing({ ri, ci }) : setViewer({ value: v, column: columns[ci].name }))}
+                        title={changed ? `Was: ${cellText(orig)}` : undefined}
                         className={clsx(
                           'flex items-center overflow-hidden border-r border-line/50 px-2.5',
                           numeric[ci] && 'justify-end tabular-nums',
+                          changed && 'bg-warn/15 text-warn',
                           sel && 'relative z-[1] bg-accent-soft outline outline-1 -outline-offset-1 outline-accent',
-                          selectedColumn === ci && !sel && 'bg-accent-soft/40',
+                          selectedColumn === ci && !sel && !changed && 'bg-accent-soft/40',
                         )}
                       >
                         <span className={clsx('truncate', v === null && 'text-faint italic', typeof v === 'object' && v !== null && 'text-ai')}>{cellText(v)}</span>
@@ -186,6 +226,50 @@ export function ResultsGrid({
       </div>
 
       {viewer && <ValueViewer {...viewer} onClose={() => setViewer(null)} />}
+    </div>
+  )
+}
+
+/** Inline cell input. Keys are kept away from the grid's own navigation handler. */
+function CellEditor({ initial, wasNull, onCommit, onCancel }: { initial: string; wasNull: boolean; onCommit: (v: string | null) => void; onCancel: () => void }) {
+  const [text, setText] = useState(initial)
+  const [isNull, setIsNull] = useState(wasNull)
+  const done = useRef(false)
+  const finish = (v: string | null | 'cancel') => {
+    if (done.current) return
+    done.current = true
+    if (v === 'cancel') onCancel()
+    else onCommit(v)
+  }
+  return (
+    <div className="relative z-[2] flex items-center gap-1 bg-canvas px-1 outline outline-2 -outline-offset-2 outline-warn">
+      <input
+        autoFocus
+        value={text}
+        placeholder={isNull ? 'NULL' : ''}
+        onFocus={(e) => e.currentTarget.select()}
+        onChange={(e) => (setText(e.target.value), setIsNull(false))}
+        onBlur={() => finish(isNull ? null : text)}
+        onKeyDown={(e) => {
+          e.stopPropagation()
+          if (e.key === 'Enter' || e.key === 'Tab') {
+            e.preventDefault()
+            finish(isNull ? null : text)
+          } else if (e.key === 'Escape') {
+            e.preventDefault()
+            finish('cancel')
+          }
+        }}
+        className="mono min-w-0 flex-1 bg-transparent text-[12.5px] outline-none placeholder:text-faint placeholder:italic"
+      />
+      <button
+        // mousedown so the input doesn't blur (and commit) first
+        onMouseDown={(e) => (e.preventDefault(), finish(null))}
+        title="Set to NULL"
+        className="shrink-0 rounded px-1 font-sans text-[9.5px] font-semibold tracking-wide text-faint hover:bg-hover hover:text-fg"
+      >
+        NULL
+      </button>
     </div>
   )
 }

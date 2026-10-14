@@ -1,9 +1,11 @@
 import clsx from 'clsx'
-import { Database, FileCode2, History, Moon, Plug, Plus, Search, Settings, Sparkles, Sun, X } from 'lucide-react'
+import { Database, FileCode2, History, Palette, Plug, Plus, Search, Settings, Sparkles, X } from 'lucide-react'
+import { useRef, useState } from 'react'
 import { useAi } from '../store/ai'
 import { useApp, type LeftPanel } from '../store/app'
 import { modKey } from '../lib/format'
-import { EditableText, Kbd, Spinner, Tooltip } from './ui'
+import { ThemeList } from './ThemePicker'
+import { EditableText, Kbd, Popover, Spinner, Tooltip } from './ui'
 
 export function Logo({ size = 26 }: { size?: number }) {
   return (
@@ -44,8 +46,9 @@ function RailButton({ icon, tip, active, onClick, badge }: { icon: React.ReactNo
 export function Rail() {
   const leftPanel = useApp((s) => s.leftPanel)
   const aiOpen = useApp((s) => s.aiOpen)
-  const theme = useApp((s) => s.theme)
   const { setPrefs } = useApp.getState()
+  const [themesOpen, setThemesOpen] = useState(false)
+  const themeBtn = useRef<HTMLSpanElement>(null)
   const toggle = (p: LeftPanel) => setPrefs({ leftPanel: leftPanel === p ? null : p })
   return (
     <div className="flex w-[52px] shrink-0 flex-col items-center gap-1 border-r border-line bg-panel py-2.5">
@@ -54,11 +57,16 @@ export function Rail() {
       </div>
       <RailButton icon={<FileCode2 size={18} />} tip="Worksheets" active={leftPanel === 'worksheets'} onClick={() => toggle('worksheets')} />
       <RailButton icon={<Database size={18} />} tip="Data" active={leftPanel === 'data'} onClick={() => toggle('data')} />
+      <RailButton icon={<Plug size={18} />} tip="Connections" active={leftPanel === 'connections'} onClick={() => toggle('connections')} />
       <RailButton icon={<History size={18} />} tip="Query history" active={leftPanel === 'history'} onClick={() => toggle('history')} />
       <div className="flex-1" />
       <RailButton icon={<Sparkles size={18} />} tip="AI assistant" active={aiOpen} onClick={() => setPrefs({ aiOpen: !aiOpen })} />
-      <RailButton icon={<Plug size={18} />} tip="New connection" onClick={() => useApp.getState().openConnectionDialog()} />
-      <RailButton icon={theme === 'dark' ? <Sun size={17} /> : <Moon size={17} />} tip={`${theme === 'dark' ? 'Light' : 'Dark'} theme`} onClick={() => setPrefs({ theme: theme === 'dark' ? 'light' : 'dark' })} />
+      <span ref={themeBtn} className="inline-flex">
+        <RailButton icon={<Palette size={17} />} tip="Theme" active={themesOpen} onClick={() => setThemesOpen((o) => !o)} />
+      </span>
+      <Popover anchor={themeBtn.current} open={themesOpen} onClose={() => setThemesOpen(false)} side="right" width={260}>
+        <ThemeList onPicked={() => setThemesOpen(false)} />
+      </Popover>
       <RailButton icon={<Settings size={18} />} tip="Settings" onClick={() => useApp.setState({ settingsOpen: true })} />
     </div>
   )

@@ -1,10 +1,11 @@
 import { Command } from 'cmdk'
-import { Database, FileCode2, FilePlus2, History, Moon, PanelLeft, Play, Plug, Settings, Sparkles, Sun, Table2, Wand2 } from 'lucide-react'
+import { Check, Database, FileCode2, FilePlus2, History, PanelLeft, Palette, Play, Plug, Settings, Sparkles, Table2, Wand2 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { focusAi } from '../lib/aiBus'
 import { formatEditor, insertText, runCurrent } from '../lib/editorActions'
 import { modKey } from '../lib/format'
+import { THEMES } from '../lib/themes'
 import { quoteIdent } from '../../../shared/sql'
 import { catalogKey, useApp } from '../store/app'
 import { DbIcon, Kbd } from './ui'
@@ -81,9 +82,6 @@ export function CommandPalette() {
             <Item icon={<History size={14} />} onSelect={act(() => useApp.getState().setPrefs({ leftPanel: 'history' }))}>
               Open query history
             </Item>
-            <Item icon={theme === 'dark' ? <Sun size={14} /> : <Moon size={14} />} onSelect={act(() => useApp.getState().setPrefs({ theme: theme === 'dark' ? 'light' : 'dark' }))}>
-              Switch to {theme === 'dark' ? 'light' : 'dark'} theme
-            </Item>
             <Item icon={<Settings size={14} />} onSelect={act(() => useApp.setState({ settingsOpen: true }))}>
               Settings
             </Item>
@@ -95,6 +93,19 @@ export function CommandPalette() {
               </Item>
             ))}
           </Command.Group>
+          {/* themes only show up once you type, so they don't flood the empty palette */}
+          {search.trim() && (
+            <Command.Group heading="Themes">
+              {THEMES.map((t) => (
+                <Item key={t.id} value={`theme ${t.name} ${t.dark ? 'dark' : 'light'}`} icon={<Palette size={14} />} onSelect={act(() => useApp.getState().setPrefs({ theme: t.id }))}>
+                  <span className="flex items-center gap-2">
+                    Theme: {t.name}
+                    {theme === t.id && <Check size={13} className="text-accent" />}
+                  </span>
+                </Item>
+              ))}
+            </Command.Group>
+          )}
           {ws && (
             <Command.Group heading="Use connection">
               {connections.map((c) => (

@@ -29,6 +29,7 @@
   --animate-shimmer: shimmer 1.4s linear infinite;
 }
 
+/* Lumen Dark defaults, shown before the saved theme is applied */
 :root {
   color-scheme: dark;
   --c-canvas: #07090f;
@@ -59,34 +60,7 @@
     radial-gradient(900px 500px at 110% 0%, rgb(167 139 250 / 0.06), transparent 60%);
 }
 
-:root[data-theme='light'] {
-  color-scheme: light;
-  --c-canvas: #f3f5f9;
-  --c-panel: #ffffff;
-  --c-raised: #f8f9fc;
-  --c-hover: #eef1f6;
-  --c-active: #e4e9f2;
-  --c-line: #e3e7ef;
-  --c-line-strong: #cfd6e3;
-  --c-fg: #111827;
-  --c-muted: #5b6477;
-  --c-faint: #98a1b3;
-  --c-accent: #0e8fd6;
-  --c-accent-fg: #ffffff;
-  --c-accent-soft: rgb(14 143 214 / 0.1);
-  --c-ai: #7c3aed;
-  --c-ai-soft: rgb(124 58 237 / 0.08);
-  --c-ok: #059669;
-  --c-warn: #b45309;
-  --c-bad: #dc2626;
-  --c-bad-soft: rgb(220 38 38 / 0.07);
-  --shadow-pop: 0 16px 40px -12px rgb(15 23 42 / 0.25), 0 0 0 1px var(--c-line-strong);
-  --series-1: #2a78d6;
-  --series-2: #eb6834;
-  --series-3: #1baf7a;
-  --series-4: #eda100;
-  --glow: none;
-}
+/* other themes are applied at runtime from web/src/lib/themes.ts */
 
 html,
 body {
@@ -111,7 +85,7 @@ body {
 }
 
 ::selection {
-  background: rgb(56 189 248 / 0.3);
+  background: color-mix(in srgb, var(--c-accent) 30%, transparent);
 }
 
 * {
@@ -139,7 +113,7 @@ button:disabled {
   background: linear-gradient(135deg, #38bdf8 0%, #818cf8 50%, #c084fc 100%);
 }
 .ai-text {
-  background: linear-gradient(90deg, #38bdf8, #a78bfa 60%, #f0abfc);
+  background: linear-gradient(90deg, var(--c-accent), var(--c-ai) 60%, var(--c-accent));
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;

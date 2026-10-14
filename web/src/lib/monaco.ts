@@ -6,6 +6,7 @@ import { quoteIdent, statementAt } from '../../../shared/sql'
 import { catalogKey, useApp } from '../store/app'
 import { aliasFor, analyze, guessJoin, resolveTable } from './completion'
 import { functionsFor, keywordsFor } from './dialect'
+import { monacoTheme, THEMES } from './themes'
 
 self.MonacoEnvironment = { getWorker: () => new EditorWorker() }
 loader.config({ monaco })
@@ -19,73 +20,7 @@ export const editors = new Map<string, Editor>()
 export const worksheetUri = (id: string) => monaco.Uri.parse(`inmemory://worksheet/${id}.sql`)
 const worksheetIdOf = (model: monaco.editor.ITextModel) => model.uri.path.replace(/^\//, '').replace(/\.sql$/, '')
 
-monaco.editor.defineTheme('lumen-dark', {
-  base: 'vs-dark',
-  inherit: true,
-  rules: [
-    { token: '', foreground: 'e7eaf3' },
-    { token: 'keyword', foreground: '7dd3fc', fontStyle: 'bold' },
-    { token: 'operator', foreground: '94a3b8' },
-    { token: 'string', foreground: 'a5e3a0' },
-    { token: 'number', foreground: 'fbbf24' },
-    { token: 'comment', foreground: '5d667c', fontStyle: 'italic' },
-    { token: 'predefined', foreground: 'd8b4fe' },
-    { token: 'identifier.quote', foreground: 'fda4af' },
-    { token: 'delimiter', foreground: '7c8599' },
-  ],
-  colors: {
-    'editor.background': '#0c1018',
-    'editor.foreground': '#e7eaf3',
-    'editorLineNumber.foreground': '#3a4256',
-    'editorLineNumber.activeForeground': '#9098ad',
-    'editor.lineHighlightBackground': '#121722',
-    'editor.lineHighlightBorder': '#00000000',
-    'editor.selectionBackground': '#38bdf840',
-    'editor.inactiveSelectionBackground': '#38bdf820',
-    'editorCursor.foreground': '#38bdf8',
-    'editorIndentGuide.background1': '#1b2130',
-    'editorWhitespace.foreground': '#283044',
-    'editorSuggestWidget.background': '#121722',
-    'editorSuggestWidget.border': '#283044',
-    'editorSuggestWidget.selectedBackground': '#1e2636',
-    'editorSuggestWidget.highlightForeground': '#38bdf8',
-    'editorSuggestWidget.focusHighlightForeground': '#7dd3fc',
-    'editorHoverWidget.background': '#121722',
-    'editorHoverWidget.border': '#283044',
-    'editorWidget.background': '#121722',
-    'editorWidget.border': '#283044',
-    'input.background': '#0c1018',
-    'scrollbarSlider.background': '#28304480',
-    'scrollbarSlider.hoverBackground': '#3a4256',
-    'diffEditor.insertedTextBackground': '#34d39926',
-    'diffEditor.removedTextBackground': '#f8717126',
-    'diffEditor.insertedLineBackground': '#34d39914',
-    'diffEditor.removedLineBackground': '#f8717114',
-    'editorGutter.background': '#0c1018',
-  },
-})
-
-monaco.editor.defineTheme('lumen-light', {
-  base: 'vs',
-  inherit: true,
-  rules: [
-    { token: 'keyword', foreground: '0369a1', fontStyle: 'bold' },
-    { token: 'string', foreground: '15803d' },
-    { token: 'number', foreground: 'b45309' },
-    { token: 'comment', foreground: '98a1b3', fontStyle: 'italic' },
-    { token: 'predefined', foreground: '7c3aed' },
-    { token: 'identifier.quote', foreground: 'be123c' },
-  ],
-  colors: {
-    'editor.background': '#ffffff',
-    'editorLineNumber.foreground': '#c3cad8',
-    'editorLineNumber.activeForeground': '#5b6477',
-    'editor.lineHighlightBackground': '#f6f8fb',
-    'editor.lineHighlightBorder': '#00000000',
-    'editorCursor.foreground': '#0e8fd6',
-    'editor.selectionBackground': '#0e8fd630',
-  },
-})
+for (const t of THEMES) monaco.editor.defineTheme(`lumen-${t.id}`, monacoTheme(t))
 
 /** Catalog lookup for completion; kicks off loading of anything missing. */
 function lookupFor(connectionId: string) {

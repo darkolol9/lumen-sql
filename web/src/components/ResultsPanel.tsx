@@ -6,6 +6,8 @@ import {
   ClipboardCopy,
   Download,
   PanelRight,
+  PencilLine,
+  Undo2,
   Search,
   Sparkles,
   Square,
@@ -17,10 +19,11 @@ import { toast } from 'sonner'
 import { askAi } from '../lib/aiBus'
 import { download, fmtDuration, fmtNumber, modKey, toCsv, toMarkdown, toTsv } from '../lib/format'
 import { useApp } from '../store/app'
+import { ApplyEditsDialog } from './ApplyEditsDialog'
 import { ColumnInspector } from './ColumnInspector'
 import { ResultChart } from './ResultChart'
-import { ResultsGrid } from './ResultsGrid'
-import { Button, IconButton, Kbd, MenuItem, Popover } from './ui'
+import { ResultsGrid, type CellEdits } from './ResultsGrid'
+import { Button, IconButton, Kbd, MenuItem, Popover, Tooltip } from './ui'
 
 function Elapsed({ since }: { since: number }) {
   const [now, setNow] = useState(Date.now())
@@ -39,9 +42,32 @@ export function ResultsPanel({ worksheetId }: { worksheetId: string }) {
   const [selectedCol, setSelectedCol] = useState<number>()
   const [exportMenu, setExportMenu] = useState(false)
   const exportBtn = useRef<HTMLSpanElement>(null)
+  const [edits, setEdits] = useState<CellEdits>({})
+  const [reviewing, setReviewing] = useState(false)
+  const currentConnId = useApp((s) => s.worksheets[worksheetId]?.connectionId)
+  const conn = useApp((s) => s.connections.find((c) => c.id === run?.connectionId))
 
   const result = run?.results[run.activeResult]
-  useEffect(() => setSelectedCol(undefined), [result])
+  useEffect(() => {
+    setSelectedCol(undefined)
+    setEdits({})
+  }, [result])
+  // only while the worksheet still points at the connection these rows came from
+  const editable = !!result?.editTarget && !!conn && !conn.readOnly && !run?.running && conn.id === currentConnId
+  useEffect(() => {
+    if (!editable) setEdits({})
+  }, [editable])
+  const editedRows = Object.keys(edits).length
+  const editedCells = Object.values(edits).reduce((n, r) => n + Object.keys(r).length, 0)
+  const onEdit = (r: number, c: number, v: string | null | undefined) =>
+    setEdits((e) => {
+      const row = { ...e[r] }
+      if (v === undefined) delete row[c]
+      else row[c] = v
+      const next = { ...e, [r]: row }
+      if (!Object.keys(row).length) delete next[r]
+      return next
+    })
 
   if (!run || (!run.running && !run.results.length && !run.error)) return <EmptyResults />
 
@@ -140,6 +166,13 @@ export function ResultsPanel({ worksheetId }: { worksheetId: string }) {
               )}
               <span className="text-faint">·</span>
               <span className="mono tabular-nums">{fmtDuration(result.elapsedMs)}</span>
+              {editable && result.kind === 'rows' && (
+                <Tooltip tip={`Rows map to ${result.editTarget!.table} by its primary key. Double-click a cell (or press F2) to edit it.`}>
+                  <span className="ml-1 flex shrink-0 items-center gap-1 rounded bg-hover px-1.5 py-[1px] text-[11px] text-muted">
+                    <PencilLine size={11} /> Editable
+                  </span>
+                </Tooltip>
+              )}
             </span>
           ) : null}
         </div>
@@ -206,7 +239,47 @@ export function ResultsPanel({ worksheetId }: { worksheetId: string }) {
             view === 'chart' ? (
               <ResultChart key={result.statement + result.elapsedMs} result={result} />
             ) : (
-              <ResultsGrid columns={result.columns} rows={result.rows} filter={filter} selectedColumn={selectedCol} onSelectColumn={setSelectedCol} />
+              <div className="flex h-full flex-col">
+                {editedCells > 0 && (
+                  <div className="flex h-9 shrink-0 items-center gap-2 border-b border-warn/30 bg-warn/10 px-3 text-[12px]">
+                    <PencilLine size={13} className="text-warn" />
+                    <span className="flex-1 text-fg">
+                      {editedCells} cell{editedCells === 1 ? '' : 's'} changed in {editedRows} row{editedRows === 1 ? '' : 's'}
+                      <span className="text-muted"> · not saved yet</span>
+                    </span>
+                    <Button size="sm" variant="ghost" icon={<Undo2 size={12} />} onClick={() => setEdits({})}>
+                      Discard
+                    </Button>
+                    <Button size="sm" variant="primary" icon={<CheckCircle2 size={12} />} onClick={() => setReviewing(true)}>
+                      Review &amp; apply
+                    </Button>
+                  </div>
+                )}
+                <div className="min-h-0 flex-1">
+                  <ResultsGrid
+                    columns={result.columns}
+                    rows={result.rows}
+                    filter={filter}
+                    selectedColumn={selectedCol}
+                    onSelectColumn={setSelectedCol}
+                    editable={editable}
+                    edits={edits}
+                    onEdit={onEdit}
+                  />
+                </div>
+                {result.editTarget && (
+                  <ApplyEditsDialog
+                    open={reviewing}
+                    onClose={() => setReviewing(false)}
+                    worksheetId={worksheetId}
+                    connectionId={run.connectionId!}
+                    resultIndex={run.activeResult}
+                    result={result}
+                    edits={edits}
+                    onApplied={() => (setReviewing(false), setEdits({}))}
+                  />
+                )}
+              </div>
             )
           ) : null}
         </div>

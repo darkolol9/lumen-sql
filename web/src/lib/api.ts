@@ -5,6 +5,7 @@ import type {
   CatalogTable,
   Connection,
   DatabaseInfo,
+  EditRequest,
   HistoryEntry,
   PublicSettings,
   RunResponse,
@@ -48,6 +49,8 @@ export const api = {
   run: (body: { connectionId: string; sql: string; database?: string; schema?: string; runId: string; worksheetId: string }) =>
     req<RunResponse>('POST', '/api/query', body),
   cancel: (runId: string) => req('POST', `/api/query/${runId}/cancel`),
+  previewEdits: (body: EditRequest) => req<{ statements: string[] }>('POST', '/api/edits/preview', body),
+  applyEdits: (body: EditRequest & { worksheetId?: string }) => req<{ statements: string[]; elapsedMs: number }>('POST', '/api/edits/apply', body),
 
   saveWorkspace: (w: Partial<Workspace>) => req<Workspace>('POST', '/api/workspaces', w),
   deleteWorkspace: (id: string) => req('DELETE', `/api/workspaces/${id}`),

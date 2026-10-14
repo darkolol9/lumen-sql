@@ -3,12 +3,12 @@ import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
 import { useApp } from '../store/app'
 import { ModelPicker } from './ModelPicker'
+import { ThemeGrid } from './ThemePicker'
 import { Button, Dialog, Field, Input, Toggle } from './ui'
 
 export function SettingsDialog() {
   const open = useApp((s) => s.settingsOpen)
   const settings = useApp((s) => s.settings)
-  const theme = useApp((s) => s.theme)
   const close = () => useApp.setState({ settingsOpen: false })
   const [key, setKey] = useState('')
   const [maxRows, setMaxRows] = useState(settings.maxRows)
@@ -87,18 +87,8 @@ export function SettingsDialog() {
           <Field label="Max rows fetched per query" hint="Larger results are truncated in the grid.">
             <Input type="number" value={maxRows} onChange={(e) => setMaxRows(Number(e.target.value))} className="w-40" />
           </Field>
-          <Field label="Theme">
-            <div className="flex w-fit gap-1 rounded-lg bg-canvas p-1 ring-1 ring-line">
-              {(['dark', 'light'] as const).map((t) => (
-                <button
-                  key={t}
-                  onClick={() => useApp.getState().setPrefs({ theme: t })}
-                  className={`rounded-md px-4 py-1 text-[12px] font-medium capitalize ${theme === t ? 'bg-active text-fg shadow-sm' : 'text-muted hover:text-fg'}`}
-                >
-                  {t}
-                </button>
-              ))}
-            </div>
+          <Field label="Theme" hint="Hover to preview, click to apply.">
+            <ThemeGrid />
           </Field>
         </section>
       </div>

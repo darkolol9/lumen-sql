@@ -12,8 +12,9 @@ import type {
   Worksheet,
 } from '../../../shared/types'
 import { api } from '../lib/api'
+import { DEFAULT_THEME, themeById } from '../lib/themes'
 
-export type LeftPanel = 'worksheets' | 'data' | 'history' | null
+export type LeftPanel = 'worksheets' | 'data' | 'connections' | 'history' | null
 
 export interface RunState {
   running: boolean
@@ -26,6 +27,8 @@ export interface RunState {
   /** Offset in the editor where the executed SQL began (for error highlighting). */
   offset?: number
   sql?: string
+  /** Connection the results came from; row edits must go back to it, even if the worksheet has switched since. */
+  connectionId?: string
 }
 
 export interface PendingEdit {
@@ -46,15 +49,17 @@ interface UiPrefs {
   activeTabId?: string
   leftPanel: LeftPanel
   aiOpen: boolean
-  theme: 'dark' | 'light'
+  /** Theme id from the registry in lib/themes.ts */
+  theme: string
 }
 
 const PREFS_KEY = 'lumen.ui'
 const loadPrefs = (): UiPrefs => {
   try {
-    return { openTabs: [], leftPanel: 'worksheets', aiOpen: true, theme: 'dark', ...JSON.parse(localStorage.getItem(PREFS_KEY) ?? '{}') }
+    const p: UiPrefs = { openTabs: [], leftPanel: 'worksheets', aiOpen: true, theme: DEFAULT_THEME, ...JSON.parse(localStorage.getItem(PREFS_KEY) ?? '{}') }
+    return { ...p, theme: themeById(p.theme).id }
   } catch {
-    return { openTabs: [], leftPanel: 'worksheets', aiOpen: true, theme: 'dark' }
+    return { openTabs: [], leftPanel: 'worksheets', aiOpen: true, theme: DEFAULT_THEME }
   }
 }
 
@@ -71,6 +76,8 @@ interface AppState extends UiPrefs {
   connectionDialog: { open: boolean; editing?: Connection }
   settingsOpen: boolean
   paletteOpen: boolean
+  /** Theme shown while hovering a theme picker, without saving it. */
+  themePreview?: string
   confirm?: { title: string; body: string; action: string; resolve: (ok: boolean) => void }
 
   bootstrap(): Promise<void>
@@ -312,7 +319,7 @@ export const useApp = create<AppState>((set, get) => ({
     const runId = crypto.randomUUID()
     const patch = (p: Partial<RunState>) =>
       set((s) => ({ runs: { ...s.runs, [worksheetId]: { ...(s.runs[worksheetId] ?? { results: [], activeResult: 0 }), ...p } } }))
-    patch({ running: true, runId, startedAt: Date.now(), error: undefined, offset, sql })
+    patch({ running: true, runId, startedAt: Date.now(), error: undefined, offset, sql, connectionId: ws.connectionId })
     try {
       const res = await api.run({ connectionId: ws.connectionId, sql, database: ws.database, schema: ws.schema, runId, worksheetId })
       const lastRows = res.results.map((r) => r.kind).lastIndexOf('rows')

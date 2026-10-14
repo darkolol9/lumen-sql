@@ -1,4 +1,4 @@
-import type { CatalogTable, DatabaseInfo, StatementResult } from '../../shared/types.ts'
+import type { CatalogTable, DatabaseInfo, EditTarget, RowEdit, StatementResult } from '../../shared/types.ts'
 
 export interface ExecContext {
   database?: string
@@ -15,6 +15,10 @@ export interface Driver {
   runBatch(statements: string[], ctx: ExecContext, onResult?: (r: StatementResult) => void): Promise<StatementResult[]>
   listDatabases(): Promise<DatabaseInfo[]>
   catalog(database: string): Promise<CatalogTable[]>
+  /** In-place row editing, for drivers that support it: builds the UPDATE statements shown to the user. */
+  buildEdits?(target: EditTarget, edits: RowEdit[]): Promise<string[]>
+  /** Runs buildEdits' statements in one transaction; rolls back unless each one matches exactly one row. */
+  applyEdits?(target: EditTarget, edits: RowEdit[]): Promise<string[]>
   close(): Promise<void>
 }
 

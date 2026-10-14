@@ -264,6 +264,7 @@ export function Popover({
   onClose,
   children,
   align = 'start',
+  side = 'bottom',
   width,
 }: {
   anchor: HTMLElement | null
@@ -271,18 +272,24 @@ export function Popover({
   onClose: () => void
   children: ReactNode
   align?: 'start' | 'end'
+  /** 'right' opens beside the anchor, bottom-aligned with it (for buttons low on the rail). */
+  side?: 'bottom' | 'right'
   width?: number
 }) {
   const ref = useRef<HTMLDivElement>(null)
-  const [pos, setPos] = useState<{ x: number; y: number; maxH: number }>()
+  const [pos, setPos] = useState<{ x: number; y?: number; bottom?: number; maxH: number }>()
   useLayoutEffect(() => {
     if (!open || !anchor) return
     const r = anchor.getBoundingClientRect()
     const w = width ?? 240
+    if (side === 'right') {
+      setPos({ x: Math.min(r.right + 8, window.innerWidth - w - 8), bottom: Math.max(8, window.innerHeight - r.bottom), maxH: r.bottom - 16 })
+      return
+    }
     let x = align === 'end' ? r.right - w : r.left
     x = Math.max(8, Math.min(x, window.innerWidth - w - 8))
     setPos({ x, y: r.bottom + 4, maxH: window.innerHeight - r.bottom - 16 })
-  }, [open, anchor, align, width])
+  }, [open, anchor, align, side, width])
   useEffect(() => {
     if (!open) return
     const onDown = (e: MouseEvent) => {
@@ -303,7 +310,7 @@ export function Popover({
       onClick={(e) => e.stopPropagation()}
       onDoubleClick={(e) => e.stopPropagation()}
       className="fixed z-50 animate-pop overflow-y-auto rounded-lg border border-line-strong bg-raised py-1"
-      style={{ left: pos.x, top: pos.y, width: width ?? 240, maxHeight: pos.maxH, boxShadow: 'var(--shadow-pop)' }}
+      style={{ left: pos.x, top: pos.y, bottom: pos.bottom, width: width ?? 240, maxHeight: pos.maxH, boxShadow: 'var(--shadow-pop)' }}
     >
       {children}
     </div>,
